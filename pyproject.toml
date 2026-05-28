@@ -5,9 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "fastmcp>=2.8.1",
-    "langchain-mcp-adapters>=0.1.7",
-    "langchain-openai>=0.3.23",
-    "langgraph>=0.4.8",
-    "pandas>=2.3.0",
+    "fastmcp>=3.3.1",
+    "langchain-mcp-adapters>=0.2.2",
+    "langchain-google-genai>=4.2.3",
+    "langgraph>=1.2.2",
+    "pandas>=3.3.0",
+    "mcp>=1.27.1",
+    "pydantic>=2.0.0",
 ]

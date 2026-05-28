@@ -1,7 +1,8 @@
-import pandas as pd 
+import pandas as pd
 from mcp.server.fastmcp import FastMCP
 from pathlib import Path
 import logging
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 mcp = FastMCP("buscador_livros")
@@ -9,22 +10,24 @@ mcp = FastMCP("buscador_livros")
 base_livros = Path(__file__).parent / "GoodReads_100k_books.csv"
 
 @mcp.tool()
-def buscador(genero: str, numero_pg: int) -> pd.DataFrame:
+def buscador(genero: str, numero_pg: int) -> dict:
     """
-    descricao: 
+    descricao:
     Função para buscar livros dentro de uma base de dados
-    a partir de um genero e numero de páginas. 
-    Importante que genero seja passado em inglês. 
+    a partir de um genero e numero de páginas.
+    Importante que genero seja passado em inglês.
 
     Args:
         genero (string): nome do genero (inglês)
         numero_pg (int): numero de paginas do livro
 
     Returns:
-        dataframe: livros encontrados com as colunas: 
-         'author', 'bookformat', 'desc', 'genre', 'img', 'isbn', 'isbn13',
-       'link', 'pages', 'rating', 'reviews', 'title', 'totalratings'
-    """   
+        dict: Resultado estruturado com lista de livros
+        {
+            "books": [{"title":..., "author":..., "pages":..., "genre":..., "rating":..., "desc":...}],
+            "count": int
+        }
+    """
 
     base = pd.read_csv(base_livros, encoding= 'utf-8')
     base['pages'] = base['pages'].astype(int)
@@ -37,43 +40,76 @@ def buscador(genero: str, numero_pg: int) -> pd.DataFrame:
             base = base_4
 
     base = base.sort_values(by="rating", ascending=False)
-    resultado = base[['title', 'author', 'pages', 'genre', 'rating', 'desc']].head(10).to_dict(orient='records')
+    books_df = base[['title', 'author', 'pages', 'genre', 'rating', 'desc']].head(10)
 
-    return resultado
+    # Convert DataFrame to structured dictionaries
+    books = []
+    for _, row in books_df.iterrows():
+        books.append({
+            "title": str(row['title']),
+            "author": str(row['author']),
+            "pages": int(row['pages']),
+            "genre": str(row['genre']),
+            "rating": float(row['rating']),
+            "desc": str(row['desc'])
+        })
+
+    return {
+        "books": books,
+        "count": len(books)
+    }
 
 @mcp.tool()
-def buscar_por_nome(titulo: str):
+def buscar_por_nome(titulo: str) -> dict:
     """
-    descricao: 
-    Função para buscar as informações de um 
+    descricao:
+    Função para buscar as informações de um
     livro dentro de uma base de dados
-    a partir do nome dele. 
-    Importante que o nome do livro seja passado em inglês. 
+    a partir do nome dele.
+    Importante que o nome do livro seja passado em inglês.
 
     Args:
         title (string): nome do livro (inglês)
 
     Returns:
-        dict: informações do livro: 
-        author: The name of the author/authors of the book
-        bookformat: The format of the book
-        desc: The description of the book
-        genre: The list of genres related to the book
-        img: Image link of the book
-        isbn: ISBN code of the book
-        isbn13: ISBN13 code of the book
-        link: The goodreads links of the book
-        pages: Number of pages in the book
-        rating: Average rating of the book
-        reviews: The number of reviews the book has
-        title: The title of the book
-        totalratings: Totalratings of the book
-    """   
-    base = pd.read_csv(base_livros, encoding= 'utf-8')
+        dict: Informações do livro encontrado ou erro
+        {
+            "book": {"title":..., "author":..., "pages":..., "genre":..., "rating":..., "desc":...},
+            "found": bool
+        }
+        ou
+        {
+            "found": false,
+            "message": "Livro não encontrado"
+        }
+    """
+    base = pd.read_csv(base_livros, encoding='utf-8')
+    base['rating'] = base['rating'].astype(float)
+    base['pages'] = base['pages'].astype(int)
 
-    base = base[base['title'].str.contains(titulo, case=False, na=False)]
+    livro_df = base[base['title'].str.contains(titulo, case=False, na=False)]
 
-    return base
+    if len(livro_df) == 0:
+        return {
+            "found": False,
+            "message": f"Livro '{titulo}' não encontrado na base de dados"
+        }
+
+    # Pega o livro com melhor avaliação
+    livro_melhor = livro_df.sort_values(by="rating", ascending=False).head(1)
+
+    row = livro_melhor.iloc[0]
+    return {
+        "book": {
+            "title": str(row['title']),
+            "author": str(row['author']),
+            "pages": int(row['pages']),
+            "genre": str(row['genre']) if pd.notna(row['genre']) else "N/A",
+            "rating": float(row['rating']),
+            "desc": str(row['desc']) if pd.notna(row['desc']) else "No description available"
+        },
+        "found": True
+    }
 
 
 if __name__ == "__main__":
